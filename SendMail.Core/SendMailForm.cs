@@ -45,7 +45,6 @@ namespace SendMail
             materialSkinManager.AddFormToManage(this);
             materialSkinManager.Theme = MaterialSkinManager.Themes.LIGHT;
             materialSkinManager.ColorScheme = new ColorScheme(Primary.BlueGrey800, Primary.BlueGrey900, Primary.BlueGrey500, Accent.LightBlue200, TextShade.WHITE);
-
             hideBtn.Enabled = false;
         }
 
@@ -64,9 +63,6 @@ namespace SendMail
             Attachment attachment1;
             Attachment attachment2;
             Attachment attachment3;
-            AttachmentFile1 = "";
-            AttachmentFile2 = "";
-            AttachmentFile3= "";
             await Task.Run(() =>
             {
                 var smtp = new SmtpClient
@@ -93,7 +89,9 @@ namespace SendMail
                         {
                             case true:
                                 {
+#pragma warning disable CS8604 // Possible null reference argument.
                                     attachment1 = new Attachment(fileName: Parse(AttachmentFile1));
+#pragma warning restore CS8604 // Possible null reference argument.
                                     message.Attachments.Add(attachment1);
                                     break;
                                 }
@@ -106,7 +104,9 @@ namespace SendMail
                         {
                             case true:
                                 {
+#pragma warning disable CS8604 // Possible null reference argument.
                                     attachment2 = new Attachment(fileName: Parse(AttachmentFile2));
+#pragma warning restore CS8604 // Possible null reference argument.
                                     message.Attachments.Add(attachment2);
                                     break;
                                 }
@@ -119,7 +119,9 @@ namespace SendMail
                         {
                             case true:
                                 {
+#pragma warning disable CS8604 // Possible null reference argument.
                                     attachment3 = new Attachment(fileName: Parse(AttachmentFile3));
+#pragma warning restore CS8604 // Possible null reference argument.
                                     message.Attachments.Add(attachment3);
                                     break;
                                 }

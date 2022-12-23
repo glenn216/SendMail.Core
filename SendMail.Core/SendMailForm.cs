@@ -22,6 +22,7 @@
 
 using MaterialSkin;
 using MaterialSkin.Controls;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Mail;
 
@@ -29,142 +30,125 @@ namespace SendMail
 {
     public partial class SendMailForm : MaterialForm
     {
-        string? AttachmentFile1 { get; set; }
-        string? AttachmentFile2 { get; set; }
-        string? AttachmentFile3 { get; set; }
+        // These strings will display the file directory of an attachment file.
+        private string? AttachmentFile1 { get; set; }
+        private string? AttachmentFile2 { get; set; }
+        private string? AttachmentFile3 { get; set; }
 
-        public bool Attachment1 = false;
-        public bool Attachment2 = false;
-        public bool Attachment3 = false;
+        // These booleans would represent the state of an attachment queue.
+        private bool IsAttachmentEnabled1 { get; set; } = false;
+        private bool IsAttachmentEnabled2 { get; set; } = false;
+        private bool IsAttachmentEnabled3 { get; set; } = false;
 
-        public SendMailForm()
+        protected internal SendMailForm()
         {
             InitializeComponent();
 
+            // Initializes the MaterialSkin package's theme for the Form.
             var materialSkinManager = MaterialSkinManager.Instance;
             materialSkinManager.AddFormToManage(this);
             materialSkinManager.Theme = MaterialSkinManager.Themes.LIGHT;
             materialSkinManager.ColorScheme = new ColorScheme(Primary.BlueGrey800, Primary.BlueGrey900, Primary.BlueGrey500, Accent.LightBlue200, TextShade.WHITE);
+        }
+
+        private void SendMailForm_Load(object sender, EventArgs e)
+        {
             hideBtn.Enabled = false;
-        }
+            smtpPortTxt.ShortcutsEnabled = false;
+            senderPasswordTxt.PasswordChar = '\u25CF';         
 
-        private void sendBtn_Click(object sender, EventArgs e)
-        {
-            _ = sendMail();
         }
-
-        protected async Task sendMail()
+   
+        private async void SendMail() // This method allows the email to be sent asynchronously.
         {
-            var fromAddress = new MailAddress(senderEmailTxt.Text, senderNameTxt.Text);
-            var toAddress = new MailAddress(recEmailTxt.Text, recNameTxt.Text);
-            string fromPassword = senderPasswordTxt.Text;
-            string subject = this.subjectTxt.Text;
-            string body = bodyRichTB.Text;
-            Attachment attachment1;
-            Attachment attachment2;
-            Attachment attachment3;
+            MailAddress senderAddress = new(senderEmailTxt.Text, senderNameTxt.Text);
+            MailAddress recipientAddress = new(recEmailTxt.Text, recNameTxt.Text);
             await Task.Run(() =>
             {
-                var smtp = new SmtpClient
+                string senderPassword = senderPasswordTxt.Text;
+                bool smtp_port_parsing = int.TryParse(smtpPortTxt.Text, out int smtp_port);
+                if (!smtp_port_parsing)
+                {
+                    MessageBox.Show("Converting the given port to an integer have failed.", string.Empty, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    smtp_port = int.Parse(smtpPortTxt.Text);
+                }
+
+                string host = smtpHostTxt.Text;
+                if (host == null)
+                {
+                    MessageBox.Show("The SMTP server host is empty or null.", string.Empty, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                SmtpClient smtp = new()
                 {
                     Host = smtpHostTxt.Text,
-                    Port = Convert.ToInt32(smtpPortTxt.Text),
+                    Port = smtp_port,
                     DeliveryMethod = SmtpDeliveryMethod.Network,
                     UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(fromAddress.Address, fromPassword)
+                    Credentials = new NetworkCredential(senderAddress.Address, senderPassword)
                 };
 
-                using var message = new MailMessage(fromAddress, toAddress)
+                string subject = subjectTxt.Text;
+                string body = messageBox.Text;
+                using var message = new MailMessage(senderAddress, recipientAddress)
                 {
                     Subject = subject,
                     Body = body
                 };
+
+                smtp.EnableSsl = enableSSLBtn.Checked; // This uses the SSL security when the radio button is checked.
+                message.IsBodyHtml = htmlCheckBox.Checked; // This uses HTML for the e-mail message when checked.
+
+                if (AttachmentFile1 != null)
+                {
+                    using Attachment attachment1 = new(AttachmentFile1);
+                    AddAttachment(message, attFileCheckBox2, attachment1);
+                }
+
+                if (AttachmentFile2 != null)
+                {
+                    using Attachment attachment2 = new(AttachmentFile2);
+                    AddAttachment(message, attFileCheckBox2, attachment2);
+                }
+                
+                if (AttachmentFile3 != null)
+                {
+                    using Attachment attachment3 = new(AttachmentFile3);
+                    AddAttachment(message, attFileCheckBox3, attachment3);
+                }
+                
                 try
                 {
-                    smtp.EnableSsl = SSL(enableSSLBtn);
-                    {
-                        message.IsBodyHtml = HTML(htmlCheckBox);
-
-                        switch (attFileCheckBox1.Checked)
-                        {
-                            case true:
-                                {
-#pragma warning disable CS8604 // Possible null reference argument.
-                                    attachment1 = new Attachment(fileName: Parse(AttachmentFile1));
-#pragma warning restore CS8604 // Possible null reference argument.
-                                    message.Attachments.Add(attachment1);
-                                    break;
-                                }
-                            case false:
-                                break;
-                            default:
-                        }
-
-                        switch (attFileCheckBox2.Checked)
-                        {
-                            case true:
-                                {
-#pragma warning disable CS8604 // Possible null reference argument.
-                                    attachment2 = new Attachment(fileName: Parse(AttachmentFile2));
-#pragma warning restore CS8604 // Possible null reference argument.
-                                    message.Attachments.Add(attachment2);
-                                    break;
-                                }
-                            case false:
-                                break;
-                            default:
-                        }
-
-                        switch (attFileCheckBox3.Checked)
-                        {
-                            case true:
-                                {
-#pragma warning disable CS8604 // Possible null reference argument.
-                                    attachment3 = new Attachment(fileName: Parse(AttachmentFile3));
-#pragma warning restore CS8604 // Possible null reference argument.
-                                    message.Attachments.Add(attachment3);
-                                    break;
-                                }
-                            case false:
-                                break;
-                            default:
-                        }
-
-                        smtp.Send(message);
-                        _ = MessageBox.Show("Message Sent", "", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
-                        message.Dispose();
-                    }
+                    smtp.Send(message);
+                    MessageBox.Show("Message Sent", string.Empty, MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                 }
                 catch (Exception ex)
                 {
-                    _ = MessageBox.Show(ex.Message, "", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    message.Dispose();
+                    MessageBox.Show(ex.Message, string.Empty, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+                message.Dispose();
             });
         }
 
-        protected static string Parse(string x)
+        private static void AddAttachment(MailMessage message, CheckBox attCheckBox, Attachment attachment)
         {
-            return string.IsNullOrWhiteSpace(x) ? "" : x;
+            // This method is used to determine whether or not the checkbox is checked and then determines whether or not the attachment should be added.
+            if (attCheckBox.Checked)
+            {
+                message.Attachments.Add(attachment);
+                return;
+            }
+            else
+            {
+                return;
+            }
         }
 
-        protected static bool SSL(RadioButton radioButton1)
-        {
-            return radioButton1.Checked switch
-            {
-                true => true,
-                _ => false,
-            };
-        }
+        private void sendBtn_Click(object sender, EventArgs e) => SendMail(); // The button would call the SendMail method.
 
-        protected static bool HTML(CheckBox checkBox)
-        {
-            return checkBox.Checked switch
-            {
-                true => true,
-                _ => false,
-            };
-        }
         private void browseBtn_Click(object sender, EventArgs e)
         {
             DialogResult result = openFileDialog1.ShowDialog();
@@ -173,9 +157,11 @@ namespace SendMail
                 attach.Text = openFileDialog1.FileName;
             }
         }
-
-        private void showBtn_Click(object sender, EventArgs e)
+        
+        private void showBtn_Click(object sender, EventArgs e) 
         {
+            // The button would disable itself ('Show') after it has been clicked while enabling the opposing function ('Hide') button.
+            // Additionally, this would allow the users to view the input without any filters.
             senderPasswordTxt.PasswordChar = '\0';
             hideBtn.Enabled = true;
             showBtn.Enabled = false;
@@ -183,42 +169,45 @@ namespace SendMail
 
         private void hideBtn_Click(object sender, EventArgs e)
         {
-            senderPasswordTxt.PasswordChar = '•';
+            // The button would disable itself ('Hide) after it has been clicked while enabling the opposing function ('Show') button.
+            // In addition, the user input would be hidden beneath censored bullets.
+            senderPasswordTxt.PasswordChar = '\u25CF';
             hideBtn.Enabled = false;
             showBtn.Enabled = true;
         }
 
         private void addBtn_Click(object sender, EventArgs e)
         {
-            switch (Attachment1)
+            switch (IsAttachmentEnabled1)
             {
-                case false when Attachment2 == false && Attachment3 == false:
+                case false when IsAttachmentEnabled2 == false && IsAttachmentEnabled3 == false:
                     AttachmentFile1 = attach.Text;
-                    Attachment1 = true;
+                    IsAttachmentEnabled1 = true;
                     attFileCheckBox1.Checked = true;
                     attFileCheckBox1.Enabled = true;
-                    attach.Text = "";
+                    attach.ResetText();
                     break;
 
-                case true when Attachment2 == false && Attachment3 == false:
+                case true when IsAttachmentEnabled2 == false && IsAttachmentEnabled3 == false:
                     AttachmentFile2 = attach.Text;
-                    Attachment2 = true;
+                    IsAttachmentEnabled2 = true;
                     attFileCheckBox2.Checked = true;
                     attFileCheckBox2.Enabled = true;
-                    attach.Text = "";
+                    attach.ResetText();
                     break;
 
-                case true when Attachment2 && Attachment3 == false:
+                case true when IsAttachmentEnabled2 && IsAttachmentEnabled3 == false:
                     AttachmentFile3 = attach.Text;
-                    Attachment3 = true;
+                    IsAttachmentEnabled3 = true;
                     attFileCheckBox3.Checked = true;
                     attFileCheckBox3.Enabled = true;
-                    attach.Text = "";
+                    attach.ResetText();
                     break;
 
-                case true when Attachment2 && Attachment3 == true:
-                    MessageBox.Show("Attachment is full. Click 'Clear All' button to reset attachments.", "", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    attach.Text = "";
+                case true when IsAttachmentEnabled2 && IsAttachmentEnabled3 == true:
+                    MessageBox.Show("The attachment queue is already full. To clear all attachments, click the 'Clear All' option.", string.Empty, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    attach.Text = string.Empty;
+                    attach.ResetText();
                     break;
                 default:
                     break;
@@ -227,18 +216,24 @@ namespace SendMail
 
         private void clearBtn_Click(object sender, EventArgs e)
         {
-            AttachmentFile2 = "";
-            AttachmentFile2 = "";
-            AttachmentFile3 = "";
+            AttachmentFile2 = string.Empty;
+            AttachmentFile2 = string.Empty;
+            AttachmentFile3 = string.Empty;
             attFileCheckBox1.Checked = false;
             attFileCheckBox1.Enabled = false;
             attFileCheckBox2.Checked = false;
             attFileCheckBox2.Enabled = false;
             attFileCheckBox3.Checked = false;
             attFileCheckBox3.Enabled = false;
-            Attachment1 = false;
-            Attachment2 = false;
-            Attachment3 = false;
+            IsAttachmentEnabled1 = false;
+            IsAttachmentEnabled2 = false;
+            IsAttachmentEnabled3 = false;
+        }
+
+        private void smtpPortTxt_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            // The event limits the input to numerical values.
+            e.Handled = !char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar);
         }
     }
 }

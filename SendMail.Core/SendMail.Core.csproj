@@ -10,6 +10,7 @@
     <Authors>Glenn Alon</Authors>
     <Company />
     <Copyright>Copyright (c) 2022 Glenn Alon</Copyright>
+    <Version>1.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
